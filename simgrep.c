@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
@@ -5,7 +6,7 @@
 #include <stdlib.h>
 #include <ctype.h>
 
-#define DEFAULT_DIR     "stdin"
+#define DEFAULT_DIR    "stdin"
 
 char * directory = "";
 char * pattern = "";
@@ -18,6 +19,10 @@ bool recursive = false;
 
 
 int searchFile(char * path){
+
+    char * (*compareFunc)(const char *, const char *); 
+    compareFunc = (ignoreCase? &strcasestr : &strstr);
+
     FILE * file;
     char line[100];
     int count = 0;
@@ -29,9 +34,17 @@ int searchFile(char * path){
 
     while(fgets(line, 100, file)){
         count++;
-        if (strstr(line, pattern)) {
-            printf("%s", line);
+        if (wholeWord){
+            char * res = (compareFunc)(line, pattern);
+            if (res != NULL){
+                //test if word is surrounded by non-word characters
+            }
+        } else {
+            if ((compareFunc)(line, pattern)) {
+                printf("%s", line);
+            }
         }
+        
     }
 
     fclose(file);
