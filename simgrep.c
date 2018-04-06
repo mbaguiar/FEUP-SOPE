@@ -57,19 +57,13 @@ int searchFile(char * path){
 
         } else {
             if ((compareFunc)(line, pattern)) {
-                if (lineNumbers) printf("%d: ", count);
+                nLines++;
+                if (!lineCount){
+                    if (lineNumbers) printf("%d: ", count);
                     printf("%s", line);
                 }
+                }
         }
-
-        if(lineCount){
-            if ((compareFunc)(line, pattern)){
-              nLines++;
-            }
-        }
-
-
-
     }
 
     if(lineCount) printf("%d\n", nLines);
