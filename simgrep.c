@@ -46,8 +46,7 @@ int searchFile(char * path){
     }
     printf("File opened\n");
 
-    //while(fgets(line, 100, file)){
-        while(true){
+    while(fgets(line, 100, file)){
         count++;
         if (wholeWord){
             //char * res = (compareFunc)(line, pattern);
