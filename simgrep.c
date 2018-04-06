@@ -77,11 +77,9 @@ int isDirectory(char * path) {
     struct stat statbuf;
     stat(path, &statbuf);
     if(S_ISDIR(statbuf.st_mode)) {
-        printf("directory\n");
-        return 0;
-    } else {
-        printf("file\n");
         return 1;
+    } else {
+        return 0;
     }
 
 }
@@ -97,16 +95,29 @@ int loopDirectory(char * path) {
         return 0;
     }
 
+    int pid;
     while((dp = readdir(dfd)) != NULL) {
-        sprintf( filename, "%s/%s",path,dp->d_name);
-        printf("filename %s\n", filename);
-        if (!isDirectory(filename)) {
+        sprintf(filename, "%s/%s",path,dp->d_name);
+        if ((strcmp(dp->d_name, ".") == 0) || strcmp(dp->d_name, "..") == 0) {
             continue;
+        }     
+         if (isDirectory(filename)) {
+             //printf("filename %s\n", filename);
+             pid = fork();
+            if (pid == 0){
+                printf("%d - Enter directory with %s\n", getpid(), filename);
+                loopDirectory(filename);
+                break;
+            } else {
+                continue;
+            } 
         } else {
-            printf("Call search file function");
-        }
+            printf("Call searchFile function, %s\n", filename);
+        } 
     }
 
+    int status;
+    waitpid(pid, &status, 0);
     return 0;
 
 }
@@ -177,14 +188,14 @@ int main(int argc, char* argv[]){
 
     }
 
-    if (!isDirectory(directory)) {
+    if (isDirectory(directory)) {
         loopDirectory(directory);
     }
 
     //printf("pattern: %s \ndirectory: %s \nignoreCase: %d \nshowFileName: %d \nlineNumbers: %d \nlineCount: %d \nwholeWord: %d \nrecursive: %d \n",
     //pattern, directory, ignoreCase, showFileName, lineNumbers, lineCount, wholeWord, recursive);
 
-    searchFile(directory);
+    //searchFile(directory);
 
     return 0;
 }
