@@ -37,12 +37,13 @@ void sigint_handler(int signo){
 
 int searchFile(char * path){
 
-    char * (*compareFunc)(const char *, const char *); 
+    char * (*compareFunc)(const char *, const char *);
     compareFunc = (ignoreCase? &strcasestr : &strstr);
 
     FILE * file;
     char line[100];
     int count = 0;
+    int nLines = 0;
     if ((file = fopen(path, "r")) == NULL){
         printf("Error opening file: %d\n", errno);
         return 1;
@@ -53,14 +54,26 @@ int searchFile(char * path){
         count++;
         if (wholeWord){
             //char * res = (compareFunc)(line, pattern);
-            
+
         } else {
             if ((compareFunc)(line, pattern)) {
                 if (lineNumbers) printf("%d: ", count);
                     printf("%s", line);
                 }
         }
+
+        if(lineCount){
+            if ((compareFunc)(line, pattern)){
+              nLines++;
+            }
+        }
+
+
+
     }
+
+    if(lineCount) printf("%d\n", nLines);
+
     fclose(file);
     return 0;
 
@@ -174,13 +187,10 @@ int main(int argc, char* argv[]){
         loopDirectory(directory);
     }
 
-    //printf("pattern: %s \ndirectory: %s \nignoreCase: %d \nshowFileName: %d \nlineNumbers: %d \nlineCount: %d \nwholeWord: %d \nrecursive: %d \n", 
+    //printf("pattern: %s \ndirectory: %s \nignoreCase: %d \nshowFileName: %d \nlineNumbers: %d \nlineCount: %d \nwholeWord: %d \nrecursive: %d \n",
     //pattern, directory, ignoreCase, showFileName, lineNumbers, lineCount, wholeWord, recursive);
 
     searchFile(directory);
 
     return 0;
 }
-
-
-
