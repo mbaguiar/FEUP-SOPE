@@ -8,6 +8,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <dirent.h>
+#include <signal.h>
+#include <unistd.h>
 
 #define DEFAULT_DIR    "stdin"
 
@@ -19,6 +21,18 @@ bool lineNumbers = false;
 bool lineCount = false;
 bool wholeWord = false;
 bool recursive = false;
+
+void sigint_handler(int signo){
+    char ans[30];
+	printf("\nAre you sure you want to terminate (Y/N)? ");
+    scanf("%s", ans);
+
+	if (strcasecmp(ans, "y") == 0) exit(0);
+	else if (strcasecmp(ans, "n") == 0) return;
+	else sigint_handler(SIGINT);
+
+	return;
+}
 
 
 int searchFile(char * path){
@@ -38,18 +52,15 @@ int searchFile(char * path){
     while(fgets(line, 100, file)){
         count++;
         if (wholeWord){
-            char * res = (compareFunc)(line, pattern);
-            if (res != NULL){
-                //test if word is surrounded by non-word characters
-            }
+            //char * res = (compareFunc)(line, pattern);
+            
         } else {
             if ((compareFunc)(line, pattern)) {
-                printf("%s", line);
-            }
+                if (lineNumbers) printf("%d: ", count);
+                    printf("%s", line);
+                }
         }
-        
     }
-
     fclose(file);
     return 0;
 
@@ -97,6 +108,16 @@ int loopDirectory(char * path) {
 int main(int argc, char* argv[]){
     directory = (char *)malloc(30*sizeof(char));
     pattern = (char *)malloc(30*sizeof(char));
+
+    struct sigaction sa;
+    sa.sa_handler = sigint_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+
+    if (sigaction(SIGINT, &sa ,NULL) == -1){
+        fprintf(stderr,"Unable to install SIGINT handler\n");
+        exit(1);
+    }
 
     if (argc < 3){
         pattern = argv[1];
