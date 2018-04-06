@@ -35,16 +35,14 @@ int searchFile(char * path){
     while(fgets(line, 100, file)){
         count++;
         if (wholeWord){
-            char * res = (compareFunc)(line, pattern);
-            if (res != NULL){
-                //test if word is surrounded by non-word characters
-            }
+            //char * res = (compareFunc)(line, pattern);
+            
         } else {
             if ((compareFunc)(line, pattern)) {
-                printf("%s", line);
-            }
+                if (lineNumbers) printf("%d: ", count);
+                    printf("%s", line);
+                }
         }
-        
     }
 
     fclose(file);
