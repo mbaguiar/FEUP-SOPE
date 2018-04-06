@@ -5,6 +5,9 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <dirent.h>
 
 #define DEFAULT_DIR    "stdin"
 
@@ -48,6 +51,44 @@ int searchFile(char * path){
     }
 
     fclose(file);
+    return 0;
+
+}
+
+int isDirectory(char * path) {
+    struct stat statbuf;
+    stat(path, &statbuf);
+    if(S_ISDIR(statbuf.st_mode)) {
+        printf("directory\n");
+        return 0;
+    } else {
+        printf("file\n");
+        return 1;
+    }
+
+}
+
+int loopDirectory(char * path) {
+    DIR *dfd;
+    struct dirent *dp;
+
+    char filename[100];
+
+    if ((dfd = opendir(path)) == NULL) {
+        fprintf(stderr, "Cant open dir %s", path);
+        return 0;
+    }
+
+    while((dp = readdir(dfd)) != NULL) {
+        sprintf( filename, "%s/%s",path,dp->d_name);
+        printf("filename %s\n", filename);
+        if (!isDirectory(filename)) {
+            continue;
+        } else {
+            printf("Call search file function");
+        }
+    }
+
     return 0;
 
 }
@@ -106,6 +147,10 @@ int main(int argc, char* argv[]){
             directory = DEFAULT_DIR;
         }
 
+    }
+
+    if (!isDirectory(directory)) {
+        loopDirectory(directory);
     }
 
     //printf("pattern: %s \ndirectory: %s \nignoreCase: %d \nshowFileName: %d \nlineNumbers: %d \nlineCount: %d \nwholeWord: %d \nrecursive: %d \n", 
