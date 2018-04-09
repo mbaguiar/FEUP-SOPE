@@ -48,25 +48,26 @@ int searchFile(char * path){
         printf("Error opening file: %d\n", errno);
         return 1;
     }
-    printf("File opened\n");
+    //printf("File opened\n");
 
     while(fgets(line, 100, file)){
         count++;
         if (wholeWord){
-            //char * res = (compareFunc)(line, pattern);
+            char * res = (compareFunc)(line, pattern);
 
         } else {
             if ((compareFunc)(line, pattern)) {
                 nLines++;
                 if (!lineCount){
                     if (lineNumbers) printf("%d: ", count);
-                    printf("%s", line);
+                    if (!showFileName) printf("%s", line);
                 }
-                }
+            }
         }
     }
 
-    if(lineCount) printf("%d\n", nLines);
+    if (nLines > 0 && showFileName) printf("%s\n", path);
+    if(lineCount && nLines > 0) printf("%d\n", nLines);
 
     fclose(file);
     return 0;
@@ -105,14 +106,14 @@ int loopDirectory(char * path) {
              //printf("filename %s\n", filename);
              pid = fork();
             if (pid == 0){
-                printf("%d - Enter directory with %s\n", getpid(), filename);
+                //printf("%d - Enter directory with %s\n", getpid(), filename);
                 loopDirectory(filename);
                 break;
             } else {
                 continue;
             } 
         } else {
-            printf("Call searchFile function, %s\n", filename);
+            searchFile(filename);
         } 
     }
 
@@ -188,8 +189,10 @@ int main(int argc, char* argv[]){
 
     }
 
-    if (isDirectory(directory)) {
+    if (recursive) {
         loopDirectory(directory);
+    } else {
+        searchFile(directory);
     }
 
     //printf("pattern: %s \ndirectory: %s \nignoreCase: %d \nshowFileName: %d \nlineNumbers: %d \nlineCount: %d \nwholeWord: %d \nrecursive: %d \n",
