@@ -40,20 +40,25 @@ int searchFile(char * path){
     char * (*compareFunc)(const char *, const char *);
     compareFunc = (ignoreCase? &strcasestr : &strstr);
 
-    FILE * file;
-    char line[100];
+    FILE * file = NULL;
+    char * line = NULL;
     int count = 0;
     int nLines = 0;
-    if ((file = fopen(path, "r")) == NULL){
+    size_t n;
+    if (path != DEFAULT_DIR){
+        if ((file = fopen(path, "r")) == NULL){
         printf("Error opening file: %d\n", errno);
         return 1;
+        }
+    } else {
+        file = stdin;
     }
-    //printf("File opened\n");
+    
 
-    while(fgets(line, 100, file)){
+    while(getline(&line, &n, file) != -1){
         count++;
         if (wholeWord){
-            char * res = (compareFunc)(line, pattern);
+            //char * res = (compareFunc)(line, pattern);
 
         } else {
             if ((compareFunc)(line, pattern)) {
@@ -65,8 +70,14 @@ int searchFile(char * path){
             }
         }
     }
+    printf("\n");
+    free(line);
 
-    if (nLines > 0 && showFileName) printf("%s\n", path);
+    if (nLines > 0 && showFileName) {
+        printf("%s\n", path);
+        return 0;
+    }
+
     if(lineCount && nLines > 0) printf("%d\n", nLines);
 
     fclose(file);
@@ -189,16 +200,10 @@ int main(int argc, char* argv[]){
 
     }
 
-    if (recursive) {
+    if (recursive && directory != DEFAULT_DIR) {
         loopDirectory(directory);
     } else {
         searchFile(directory);
     }
-
-    //printf("pattern: %s \ndirectory: %s \nignoreCase: %d \nshowFileName: %d \nlineNumbers: %d \nlineCount: %d \nwholeWord: %d \nrecursive: %d \n",
-    //pattern, directory, ignoreCase, showFileName, lineNumbers, lineCount, wholeWord, recursive);
-
-    //searchFile(directory);
-
     return 0;
 }
