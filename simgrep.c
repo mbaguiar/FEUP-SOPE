@@ -34,17 +34,32 @@ void sigint_handler(int signo){
 	return;
 }
 
-
-int searchFile(char * path){
-
+bool findWord(char * line){
     char * (*compareFunc)(const char *, const char *);
     compareFunc = (ignoreCase? &strcasestr : &strstr);
 
+    if (wholeWord){
+        char * word;
+        if ((word = (compareFunc)(line, pattern))){
+            return ((word == line || *(word - 1) == ' ' || *(word - 1) == '\0' || *(word - 1) == '\n') && 
+            (*(word + strlen(pattern) ) == ' ' || *(word + strlen(pattern)) == '\0' || *(word + strlen(pattern) ) == '\n'));
+        }
+    } else {
+        if ((compareFunc)(line, pattern)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+
+int searchFile(char * path){
     FILE * file = NULL;
     char * line = NULL;
     int count = 0;
     int nLines = 0;
     size_t n;
+    bool found = false;
     if (path != DEFAULT_DIR){
         if ((file = fopen(path, "r")) == NULL){
         printf("Error opening file: %d\n", errno);
@@ -53,22 +68,18 @@ int searchFile(char * path){
     } else {
         file = stdin;
     }
-    
 
-    while(getline(&line, &n, file) != -1){
+    //while(getline(&line, &n, file) != -1){
+    while(true){
         count++;
-        if (wholeWord){
-            //char * res = (compareFunc)(line, pattern);
-
-        } else {
-            if ((compareFunc)(line, pattern)) {
+        found = findWord(line);
+            if (found) {
                 nLines++;
                 if (!lineCount){
                     if (lineNumbers) printf("%d: ", count);
                     if (!showFileName) printf("%s", line);
                 }
             }
-        }
     }
     printf("\n");
     free(line);
