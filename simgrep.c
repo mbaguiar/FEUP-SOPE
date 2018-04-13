@@ -21,14 +21,22 @@ bool lineNumbers = false;
 bool lineCount = false;
 bool wholeWord = false;
 bool recursive = false;
+int totalLineCount = 0;
+
 
 void sigint_handler(int signo){
+    kill(0, SIGTSTP);
     char ans[30];
-	printf("\nAre you sure you want to terminate (Y/N)? ");
-    scanf("%s", ans);
+    printf("\n");
+    do {
+        printf("Are you sure you want to terminate (Y/N)? ");
+        scanf("%s", ans);
+    } while(strcasecmp(ans, "y") != 0 && strcasecmp(ans, "n") != 0);
+	
 	if (strcasecmp(ans, "y") == 0) exit(0);
-	else if (strcasecmp(ans, "n") == 0) return;
-	else sigint_handler(SIGINT);
+	else if (strcasecmp(ans, "n") == 0) {
+        kill(0, SIGCONT);
+    }
 	return;
 }
 
@@ -71,23 +79,24 @@ int searchFile(char * path){
         found = findWord(line);
             if (found) {
                 nLines++;
+                totalLineCount++;
                 if (!lineCount){
-                    if (lineNumbers) printf("%d: ", count);
-                    if (!showFileName) printf("%s", line);
+                    if (!showFileName) {
+                        if (recursive) printf("%s:", path);
+                        if (lineNumbers) printf("%d: ", count);
+                        printf("%s", line);
+                        if (*(line + strlen(line) - 1) != '\n') printf("\n");
+                    }
                 }
             }
     }
 
-    printf("\n");
     free(line);
 
     if (nLines > 0 && showFileName) {
         printf("%s\n", path);
         return 0;
     }
-
-    if(lineCount && nLines > 0) printf("%d\n", nLines);
-
     fclose(file);
     return 0;
 
@@ -122,7 +131,18 @@ int loopDirectory(char * path) {
         if (isDirectory(filename)) {
              pid = fork();
             if (pid == 0) {
+
+                struct sigaction sa;
+                sa.sa_handler = SIG_DFL;
+                sigemptyset(&sa.sa_mask);
+                sa.sa_flags = 0;
+
                 sigignore(SIGINT);
+
+                if (sigaction(SIGTSTP, &sa ,NULL) == -1){
+                    fprintf(stderr,"Unable to install SIGTSTP handler\n");
+                    exit(1);
+                }
                 loopDirectory(filename);
                 break;
             } else {
@@ -151,6 +171,13 @@ int main(int argc, char* argv[]){
 
     if (sigaction(SIGINT, &sa ,NULL) == -1){
         fprintf(stderr,"Unable to install SIGINT handler\n");
+        exit(1);
+    }
+
+    sa.sa_handler = SIG_IGN;
+
+    if (sigaction(SIGTSTP, &sa ,NULL) == -1){
+        fprintf(stderr,"Unable to install SIGTSTP handler\n");
         exit(1);
     }
 
@@ -204,10 +231,11 @@ int main(int argc, char* argv[]){
 
     }
 
-    if (isDirectory(directory)) {
+    if (recursive && directory != DEFAULT_DIR) {
         loopDirectory(directory);
     } else {
         searchFile(directory);
     }
+    if (lineCount) printf("%d\n", totalLineCount);
     return 0;
 }
