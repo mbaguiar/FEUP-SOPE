@@ -118,7 +118,7 @@ int loopDirectory(char * path) {
     char filename[100];
 
     if ((dfd = opendir(path)) == NULL) {
-        fprintf(stderr, "Cant open dir %s", path);
+        fprintf(stderr, "Cannot open dir %s\n", path);
         return 0;
     }
 
