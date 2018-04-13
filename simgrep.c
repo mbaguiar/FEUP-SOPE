@@ -204,7 +204,7 @@ int main(int argc, char* argv[]){
 
     }
 
-    if (recursive && directory != DEFAULT_DIR) {
+    if (isDirectory(directory)) {
         loopDirectory(directory);
     } else {
         searchFile(directory);
