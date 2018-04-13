@@ -5,11 +5,11 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <ctype.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 #include <dirent.h>
 #include <signal.h>
 #include <unistd.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #define DEFAULT_DIR    "stdin"
 
@@ -26,19 +26,15 @@ void sigint_handler(int signo){
     char ans[30];
 	printf("\nAre you sure you want to terminate (Y/N)? ");
     scanf("%s", ans);
-
 	if (strcasecmp(ans, "y") == 0) exit(0);
 	else if (strcasecmp(ans, "n") == 0) return;
 	else sigint_handler(SIGINT);
-
 	return;
 }
 
 bool findWord(char * line){
     char * (*compareFunc)(const char *, const char *);
     compareFunc = (ignoreCase? &strcasestr : &strstr);
-    while(1) {
-
     if (wholeWord){
         char * word;
         if ((word = (compareFunc)(line, pattern))){
@@ -49,7 +45,6 @@ bool findWord(char * line){
         if ((compareFunc)(line, pattern)) {
             return true;
         }
-    }
     }
     return false;
 }
@@ -64,8 +59,8 @@ int searchFile(char * path){
     bool found = false;
     if (path != DEFAULT_DIR){
         if ((file = fopen(path, "r")) == NULL){
-        printf("Error opening file: %d\n", errno);
-        return 1;
+            printf("Error opening file: %d\n", errno);
+            return 1;
         }
     } else {
         file = stdin;
@@ -82,6 +77,7 @@ int searchFile(char * path){
                 }
             }
     }
+
     printf("\n");
     free(line);
 
@@ -105,13 +101,11 @@ int isDirectory(char * path) {
     } else {
         return 0;
     }
-
 }
 
 int loopDirectory(char * path) {
     DIR *dfd;
     struct dirent *dp;
-
     char filename[100];
 
     if ((dfd = opendir(path)) == NULL) {
@@ -126,7 +120,6 @@ int loopDirectory(char * path) {
             continue;
         }     
         if (isDirectory(filename)) {
-             //printf("filename %s\n", filename);
              pid = fork();
             if (pid == 0) {
                 sigignore(SIGINT);
@@ -199,7 +192,6 @@ int main(int argc, char* argv[]){
             }
 
             break;
-
         }
 
         pattern = argv[i];
