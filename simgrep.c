@@ -37,6 +37,7 @@ void sigint_handler(int signo){
 bool findWord(char * line){
     char * (*compareFunc)(const char *, const char *);
     compareFunc = (ignoreCase? &strcasestr : &strstr);
+    while(1) {
 
     if (wholeWord){
         char * word;
@@ -48,6 +49,7 @@ bool findWord(char * line){
         if ((compareFunc)(line, pattern)) {
             return true;
         }
+    }
     }
     return false;
 }
@@ -69,8 +71,7 @@ int searchFile(char * path){
         file = stdin;
     }
 
-    //while(getline(&line, &n, file) != -1){
-    while(true){
+    while(getline(&line, &n, file) != -1){
         count++;
         found = findWord(line);
             if (found) {
@@ -124,11 +125,11 @@ int loopDirectory(char * path) {
         if ((strcmp(dp->d_name, ".") == 0) || strcmp(dp->d_name, "..") == 0) {
             continue;
         }     
-         if (isDirectory(filename)) {
+        if (isDirectory(filename)) {
              //printf("filename %s\n", filename);
              pid = fork();
-            if (pid == 0){
-                //printf("%d - Enter directory with %s\n", getpid(), filename);
+            if (pid == 0) {
+                sigignore(SIGINT);
                 loopDirectory(filename);
                 break;
             } else {
