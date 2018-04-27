@@ -212,7 +212,6 @@ int main(int argc, char* argv[]){
                     wholeWord = true;
                     continue;
             }
-
             if (strcmp(argv[i], "-r") == 0){
                     recursive = true;
                     continue;
