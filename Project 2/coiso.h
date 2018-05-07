@@ -11,9 +11,10 @@
 
 int readline(int fd, char *str){
     int n;
-
+    int num = 0;
     do {
         n = read(fd,str,1);
+        if (n) num++;
     } while (n>0 && *str++ != '\0');
-    return (n>0);
+    return (num);
 }

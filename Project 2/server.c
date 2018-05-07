@@ -4,6 +4,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/file.h> 
+#include <string.h>
 #include "coiso.h"
 
 unsigned int num_room_seats;
@@ -42,11 +43,11 @@ int main(int argc, char *argv[]){
 
     printf("antes do while\n");
 
-    while(readline(fdrequests, str)) {
-        printf("%s\n",str);
-        printf("dentro do while\n");
-
+    do {
+        int n = readline(fdrequests, str);
+        if (n) printf("%s\n", str);
     }
+    while(1);
 
     printf("fora do while\n");
     

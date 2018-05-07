@@ -46,6 +46,6 @@ int main(int argc, char *argv[]){
     int len = strlen("loladamixeroni");
     write(fdrequests, "loladamixeroni", len);
     close(fdrequests);
-
+    unlink(fifoname);
     return 0;
 }
