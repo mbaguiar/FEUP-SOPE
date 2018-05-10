@@ -68,7 +68,17 @@ void storeRequest(char *message) {
 
 int isSeatFree(Seat *seats, int seatNum) {
     DELAY();
-    return (seats[seatNum - 1].clientId = 0);
+    return (seats[seatNum - 1].clientId == 0);
+}
+
+void bookSeat(Seat *seats, int seatNum, int clientId) {
+    seats[seatNum - 1].clientId = clientId;
+    DELAY();
+}
+
+void freeSeat(Seat *seats, int seatNum) {
+    seats[seatNum - 1].clientId = 0;
+    DELAY();
 }
 
 int validateRequest(Request request) {
@@ -149,6 +159,33 @@ void writeErrorToSlog(Request request, int error, int t) {
     sendAnswerToClient(message, request.clientId);
 }
 
+void bookRequest(Request request, int thread_num) {
+    int booked_seats_num = 0;
+    int booked_seats[request.num_seats];
+    int i;
+    for (i = 0; i < request.num_wanted_seats; i++) {
+
+        if(isSeatFree(seats, request.seats[i])) {
+            bookSeat(seats, request.seats[i], request.clientId);
+            booked_seats[i] = request.seats[i];
+            booked_seats_num++;
+            
+        }
+
+        if (booked_seats_num == request.num_seats) {
+            printf("success\n");
+            return;
+        }
+    }
+
+    if (booked_seats_num != 0) {
+        for (i = 0; i < booked_seats_num; i++) {
+            freeSeat(seats, booked_seats[i]);
+        }
+    }
+}
+
+
 void *waitForRequest(void *threadnum) {
     
     char message[10];
@@ -172,11 +209,17 @@ void *waitForRequest(void *threadnum) {
         pthread_mutex_unlock(&buffer_lock);  
 
         int result = validateRequest(request);
-        if (result != 0)
+        if (result != 0) {
             writeErrorToSlog(request, result, *(int *) threadnum);
-
-        if (isRoomFull())
+            continue;
+        }
+        else if (isRoomFull()) {
             writeErrorToSlog(request, FULL, *(int *) threadnum);
+            continue;
+        }
+
+        printf("book request\n");
+        bookRequest(request, *(int *) threadnum);
     }
 
     sprintf(message, "%02d-CLOSE\n", *(int *) threadnum);
@@ -185,15 +228,6 @@ void *waitForRequest(void *threadnum) {
     pthread_exit(NULL);
 }
 
-void bookSeat(Seat *seats, int seatNum, int clientId) {
-    seats[seatNum - 1].clientId = clientId;
-    DELAY();
-}
-
-void freeSeat(Seat *seats, int seatNum) {
-    seats[seatNum - 1].clientId = 0;
-    DELAY();
-}
 
 
 int main(int argc, char *argv[]){
