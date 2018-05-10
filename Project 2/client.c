@@ -11,7 +11,19 @@ unsigned int time_out;
 unsigned int num_wanted_seats;
 unsigned int pref_seat_list[MAX_CLI_SEATS];
 unsigned int pref_seat_count = 0;
+char message[500];
 
+void createMessage() {
+    sprintf(message, "%d %d ", getpid(), num_wanted_seats);
+    int i;
+    for (i = 0; i < pref_seat_count; i++) {
+        char num[6];
+        sprintf(num, "%d ", pref_seat_list[i]);
+        strcat(message, num);
+    }
+
+    printf("%s\n", message);
+}
 
 int main(int argc, char *argv[]){
     if (argc < 4){
@@ -42,10 +54,13 @@ int main(int argc, char *argv[]){
         return 1;
     }
 
+    createMessage();
+
     int fdrequests = open(FIFO_REQ_NAME, O_WRONLY);
-    int len = strlen("loladamixeroni");
-    write(fdrequests, "loladamixeroni", len);
+    int len = strlen(message);
+    write(fdrequests, message, len);
     close(fdrequests);
+
     unlink(fifoname);
     return 0;
 }
