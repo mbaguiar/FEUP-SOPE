@@ -11,6 +11,7 @@
 
 typedef struct {
     int clientId;
+    int num;
 } Seat;
 
 unsigned int num_room_seats;
@@ -21,8 +22,9 @@ Seat seats[MAX_CLI_SEATS];
 Request *buffer;
 int bufferCount = 0;
 pthread_mutex_t buffer_lock = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t slots_lock = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t num_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t slots_cond = PTHREAD_COND_INITIALIZER;
+int fdSlog;
 
 
 void setupSeats() {
@@ -30,6 +32,7 @@ void setupSeats() {
     Seat seat;
     seat.clientId = 0;
     for (i = 0; i < num_room_seats; i++) {
+        seat.num = i+1;
         seats[i] = seat;
     }
 }
@@ -65,12 +68,75 @@ void storeRequest(char *message) {
 
 int isSeatFree(Seat *seats, int seatNum) {
     DELAY();
+    return (seats[seatNum - 1].clientId = 0);
+}
+
+int validateRequest(Request request) {
+    if (request.num_seats > MAX_CLI_SEATS)
+        return MAX_SEAT;
+    if (request.num_wanted_seats > MAX_CLI_SEATS || request.num_wanted_seats <= 0)
+        return INVALID_NUM_WANTED_SEATS;
+    if (request.num_seats <= 0)
+        return INVALID_PARAM;
+    if (request.num_seats > num_room_seats)
+        return INVALID_PARAM;
+    if (request.num_wanted_seats < request.num_seats)
+        return INVALID_PARAM;
+
+    int i;
+    for (i = 0; i < request.num_wanted_seats; i++) {
+        if (request.seats[i] <= 0 || request.seats[i] > num_room_seats)
+            return INVALID_SEAT;
+    }
+
     return 0;
 }
 
+void writeErrorToSlog(Request request, int error, int t) {
+    char message[1000];
+
+    sprintf(message, "%02d-%05d-%02d:", t, request.clientId, request.num_seats);
+
+    int i;
+
+    for (i = 0; i < request.num_wanted_seats; i++) {
+       char temp[6];
+       sprintf(temp, " %04d", request.seats[i]);
+       strcat(message, temp);
+    }
+    switch(error) {
+        case -1:
+            strcat(message, " - MAX\n");
+            break;
+        case -2:
+            strcat(message, " - NST\n");
+            break;
+        case -3:
+            strcat(message, " - IID\n");
+            break;
+        case -4:
+            strcat(message, " - ERR\n");
+            break;
+        case -5:
+            strcat(message, " - NAV\n");
+            break;
+        case -6:
+            strcat(message, " - FUL\n");
+
+    }
+
+    write(fdSlog, message, strlen(message));
+}
+
 void *waitForRequest(void *threadnum) {
-    //sleep(1);
-    printf("Hello from thread no. %d!\n", *(int *) threadnum);
+    
+    char message[10];
+    Request request;
+    
+    sprintf(message, "%02d-OPEN\n", *(int *) threadnum);
+    
+
+    write(fdSlog, message, strlen(message));
 
     while(1) {
 
@@ -79,19 +145,30 @@ void *waitForRequest(void *threadnum) {
             pthread_cond_wait(&slots_cond, &buffer_lock);
         
         bufferCount = 0;
+        request = *buffer;
         printf("%d\n", buffer->clientId);
 
         pthread_mutex_unlock(&buffer_lock);  
+
+        int result = validateRequest(request);
+        if (result != 0)
+            writeErrorToSlog(request, result, *(int *) threadnum);
+
     }
 
+    sprintf(message, "%02d-CLOSE\n", *(int *) threadnum);
+
+    write(fdSlog, message, strlen(message));
     pthread_exit(NULL);
 }
 
 void bookSeat(Seat *seats, int seatNum, int clientId) {
+    seats[seatNum - 1].clientId = clientId;
     DELAY();
 }
 
 void freeSeat(Seat *seats, int seatNum) {
+    seats[seatNum - 1].clientId = 0;
     DELAY();
 }
 
@@ -126,11 +203,18 @@ int main(int argc, char *argv[]){
     buffer = (Request *)malloc (sizeof(Request));
 
     pthread_t threads[num_ticket_offices];
-    int t;
-    for (t = 0; t < num_ticket_offices; t++) {
-        pthread_create(&threads[t], NULL, waitForRequest, (void *) &t);
-        //pthread_join(threads[t], NULL);
+    int threads_num[num_ticket_offices];
+    int t = 1;
+
+    fdSlog = open(SLOG_FILE, O_WRONLY | O_TRUNC | O_CREAT, 0664);
+
+
+    for (t = 1; t <= num_ticket_offices; t++) {
+        threads_num[t-1] = t;
+        pthread_create(&threads[t-1], NULL, waitForRequest, (void *) &threads_num[t-1]);
     }
+
+
 
     int fdrequests = open(FIFO_REQ_NAME, O_RDONLY);
 
@@ -155,6 +239,8 @@ int main(int argc, char *argv[]){
     
     close(fdrequests);
     unlink(FIFO_REQ_NAME);
+    pthread_mutex_destroy(&buffer_lock);
+    pthread_cond_destroy(&slots_cond);
     //printf("nrs: %d\nnto: %d\not: %d\n", num_room_seats, num_ticket_offices, open_time);
 
     return 0;

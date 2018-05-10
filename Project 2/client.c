@@ -11,7 +11,7 @@ unsigned int time_out;
 unsigned int num_wanted_seats;
 unsigned int pref_seat_list[MAX_CLI_SEATS];
 unsigned int pref_seat_count = 0;
-char message[500];
+char message[1000];
 
 void createMessage() {
     sprintf(message, "%d %d ", getpid(), num_wanted_seats);
