@@ -17,7 +17,7 @@ typedef struct {
 unsigned int num_room_seats;
 unsigned int num_ticket_offices;
 unsigned int open_time;
-Seat seats[MAX_CLI_SEATS];
+Seat seats[MAX_ROOM_SEATS];
 //mudar eventualmente nao sei o que é suposto fazer
 Request *buffer;
 int bufferCount = 0;
@@ -92,6 +92,24 @@ int validateRequest(Request request) {
     return 0;
 }
 
+int isRoomFull() {
+    int i;
+    for (i = 0; i < num_room_seats; i++) {
+        if (seats[i].clientId == 0)
+        return 0;
+    }
+    return 1;
+}
+
+void sendAnswerToClient(char* answer, int idClient) {
+    printf("%s\n", answer);
+    char fifoname[strlen(FIFO_ANS_PREFIX) + WIDTH_PID + 1];
+    sprintf(fifoname, "%s%d", FIFO_ANS_PREFIX, idClient);
+    int fdAnswer = open(fifoname, O_WRONLY);
+    write(fdAnswer, answer, strlen(answer));
+    close(fdAnswer);
+} 
+
 void writeErrorToSlog(Request request, int error, int t) {
     char message[1000];
 
@@ -105,27 +123,30 @@ void writeErrorToSlog(Request request, int error, int t) {
        strcat(message, temp);
     }
     switch(error) {
-        case -1:
+        case MAX_SEAT:
             strcat(message, " - MAX\n");
             break;
-        case -2:
+        case INVALID_NUM_WANTED_SEATS:
             strcat(message, " - NST\n");
             break;
-        case -3:
+        case INVALID_SEAT:
             strcat(message, " - IID\n");
             break;
-        case -4:
+        case INVALID_PARAM:
             strcat(message, " - ERR\n");
             break;
-        case -5:
+        case UNAVAILABLE_SEAT:
             strcat(message, " - NAV\n");
             break;
-        case -6:
+        case FULL:
             strcat(message, " - FUL\n");
+            break;
 
     }
 
     write(fdSlog, message, strlen(message));
+    sprintf(message, "%d", error);
+    sendAnswerToClient(message, request.clientId);
 }
 
 void *waitForRequest(void *threadnum) {
@@ -154,6 +175,8 @@ void *waitForRequest(void *threadnum) {
         if (result != 0)
             writeErrorToSlog(request, result, *(int *) threadnum);
 
+        if (isRoomFull())
+            writeErrorToSlog(request, FULL, *(int *) threadnum);
     }
 
     sprintf(message, "%02d-CLOSE\n", *(int *) threadnum);

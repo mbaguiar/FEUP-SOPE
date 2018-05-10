@@ -10,6 +10,7 @@
 #define FIFO_ANS_PREFIX "ans"
 #define SLOG_FILE "slog.txt"
 #define SBOOK_FILE "sbook.txt"
+#define CLOG_FILE "clog.txt"
 #define MAX_SEAT -1
 #define INVALID_NUM_WANTED_SEATS -2
 #define INVALID_SEAT -3

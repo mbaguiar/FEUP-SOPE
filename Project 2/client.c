@@ -12,6 +12,7 @@ unsigned int num_wanted_seats;
 unsigned int pref_seat_list[MAX_CLI_SEATS];
 unsigned int pref_seat_count = 0;
 char message[1000];
+int fdClog;
 
 void createMessage() {
     sprintf(message, "%d %d ", getpid(), num_wanted_seats);
@@ -23,6 +24,57 @@ void createMessage() {
     }
 
     printf("%s\n", message);
+}
+
+void writeErrorToClog(int error) {
+    char message[20];
+    char *err;
+
+    switch(error) {
+        case MAX_SEAT:
+            err = "MAX";
+            break;
+        case INVALID_NUM_WANTED_SEATS:
+            err = "NST";
+            break;
+        case INVALID_SEAT:
+            err = "IID";
+            break;
+        case UNAVAILABLE_SEAT:
+            err = "NAV";
+            break;
+        case FULL:
+            err = "FUL";
+            break;
+    }
+
+    sprintf(message, "%d %s\n", getpid(), err);
+    write(fdClog, message, strlen(message));
+}
+
+void writeSuccessToClog(int num, int seat_n, int i) {
+    char message[20];
+    sprintf(message, "%05d %02d.%02d %04d\n", getpid(), i, num, seat_n);
+    write(fdClog, message, strlen(message));
+}
+
+void processAnswer(char *message) {
+    int num;
+    char *token;
+    char s[] = " ";
+    token = strtok(message, s);
+    num = strtoul(token, NULL, 0);
+
+    if (num < 0) writeErrorToClog(num);
+
+    int i;
+    for(i = 1; i <= num; i++) {
+        token = strtok(NULL, s);
+        int seat_n = strtoul(token, NULL, 0);
+        writeSuccessToClog(num, seat_n, i);
+    }
+
+    close(fdClog);
 }
 
 int main(int argc, char *argv[]){
@@ -61,6 +113,23 @@ int main(int argc, char *argv[]){
     write(fdrequests, message, len);
     close(fdrequests);
 
+    int fdAnswer = open(fifoname, O_RDONLY);
+    fdClog = open(CLOG_FILE, O_WRONLY | O_CREAT | O_TRUNC, 0664);
+    char str[500];
+
+    do {
+        int n = readline(fdAnswer, str);
+        if (n) {
+            printf("%s\n", str);
+            processAnswer(str);
+            break;
+        }
+    }
+    while(1);
+
+
+
+    close(fdAnswer);
     unlink(fifoname);
     return 0;
 }
