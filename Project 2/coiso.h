@@ -19,6 +19,7 @@
 #define UNAVAILABLE_SEAT -5
 #define FULL -6
 #define TIME_OUT -7
+#define SERVER_CLOSED "SERVER CLOSE\n"
 
 typedef struct {
     int clientId;

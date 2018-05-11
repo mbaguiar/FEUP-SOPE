@@ -250,12 +250,13 @@ void *waitForRequest(void *threadnum) {
 
         pthread_mutex_lock(&buffer_lock);
         while(bufferCount != 1 && !closeTicketOffices) {
-            printf("while %d\n", *(int *) threadnum);
+            //printf("while %d\n", *(int *) threadnum);
             pthread_cond_wait(&slots_cond, &buffer_lock);
         }
         
         if (closeTicketOffices) {
             printf("fechaaar\n");
+            pthread_mutex_unlock(&buffer_lock);
             continue;
         }
 
@@ -306,10 +307,13 @@ void timeout_handler(int signo) {
 
     closeTicketOffices = 1;
 
-    //int t;
-    //for (t = 0; t < num_ticket_offices; t++) {
-       // pthread_join(threads[t], NULL);
-   // }
+    pthread_cond_broadcast(&slots_cond);
+    
+    int t;
+    for (t = 0; t < num_ticket_offices; t++) {
+        pthread_join(threads[t], NULL);
+
+    }
 
     storeBookedSeats();
     write(fdSlog, SERVER_CLOSED, strlen(SERVER_CLOSED));
@@ -319,7 +323,7 @@ void timeout_handler(int signo) {
     pthread_mutex_destroy(&buffer_lock);
     pthread_cond_destroy(&slots_cond);
 
-    exit(0);
+    pthread_exit(0);
 }
 
 
