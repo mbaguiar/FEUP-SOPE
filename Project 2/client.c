@@ -6,6 +6,7 @@
 #include <sys/file.h>
 #include <string.h>
 #include <time.h>
+#include <signal.h>
 #include "coiso.h"
 
 unsigned int time_out;
@@ -13,8 +14,11 @@ unsigned int num_wanted_seats;
 unsigned int pref_seat_list[MAX_CLI_SEATS];
 unsigned int pref_seat_count = 0;
 char message[1000];
+char fifoname[3 + WIDTH_PID + 1];
 int fdClog;
 int fdCBook;
+int fdAnswer;
+
 
 void createMessage() {
     sprintf(message, "%d %d ", getpid(), num_wanted_seats);
@@ -25,7 +29,7 @@ void createMessage() {
         strcat(message, num);
     }
 
-    printf("%s\n", message);
+    //printf("%s\n", message);
 }
 
 void writeErrorToClog(int error) {
@@ -76,6 +80,8 @@ void processAnswer(char *message) {
     token = strtok(message, s);
     num = strtoul(token, NULL, 0);
 
+    //printf("%d\n", num);
+
     if (num < 0) {
         writeErrorToClog(num);
         close(fdClog);
@@ -86,11 +92,20 @@ void processAnswer(char *message) {
     for(i = 1; i <= num; i++) {
         token = strtok(NULL, s);
         int seat_n = strtoul(token, NULL, 0);
+        //printf("%d\n", seat_n);
         writeSuccessToClog(num, seat_n, i);
         storeBookedSeat(seat_n);
     }
 
     close(fdClog);
+}
+
+void timeout_handler(int signo) {
+    writeErrorToClog(TIME_OUT);
+    close(fdCBook);
+    close(fdAnswer);
+    unlink(fifoname);
+    exit(0);
 }
 
 int main(int argc, char *argv[]){
@@ -114,7 +129,7 @@ int main(int argc, char *argv[]){
         pref_seat_count++;
     }
 
-    char fifoname[strlen(FIFO_ANS_PREFIX) + WIDTH_PID + 1];
+    
     sprintf(fifoname, "%s%d", FIFO_ANS_PREFIX, getpid());
     
     if (mkfifo(fifoname, 0660)){
@@ -124,37 +139,38 @@ int main(int argc, char *argv[]){
 
     createMessage();
 
-    int fdrequests = open(FIFO_REQ_NAME, O_WRONLY | O_NONBLOCK);
+    struct sigaction sa;
+    sa.sa_handler = timeout_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+
+    if (sigaction(SIGALRM, &sa, NULL) == -1) {
+        fprintf(stderr,"Unable to install SIGALRM handler\n");
+        exit(1);
+    }
+
+    alarm(time_out);
+    
+    fdClog = open(CLOG_FILE, O_WRONLY | O_CREAT | O_APPEND, 0664);
+
+    int fdrequests = open(FIFO_REQ_NAME, O_WRONLY);
     int len = strlen(message);
     write(fdrequests, message, len);
     close(fdrequests);
 
-    int fdAnswer = open(fifoname, O_RDONLY | O_NONBLOCK);
-    fdClog = open(CLOG_FILE, O_WRONLY | O_CREAT | O_APPEND, 0664);
+    fdAnswer = open(fifoname, O_RDONLY);
     fdCBook = open(CBOOK_FILE, O_WRONLY | O_CREAT | O_APPEND, 0664);
     char str[500];
-
-    time_t endwait;
-    time_t start = time(NULL);
-    time_t seconds = time_out;
-
-    endwait = start + seconds;
-    int timedOut = 1;
 
     do {
         int n = readline(fdAnswer, str);
         if (n) {
-            printf("%s\n", str);
+            //printf("%s\n", str);
             processAnswer(str);
-            timedOut = 0;
             break;
         }
-        start = time(NULL);
-    } while(start < endwait);
-
-    if (timedOut) {
-        writeErrorToClog(TIME_OUT);
-    }
+        
+    } while(1);
 
 
     close(fdCBook);

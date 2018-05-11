@@ -7,6 +7,8 @@
 #include <string.h>
 #include <pthread.h>
 #include <semaphore.h>
+#include <time.h>
+#include <signal.h>
 #include "coiso.h"
 
 typedef struct {
@@ -25,6 +27,9 @@ pthread_mutex_t buffer_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t num_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t slots_cond = PTHREAD_COND_INITIALIZER;
 int fdSlog;
+int fdrequests;
+pthread_t *threads;
+int closeTicketOffices = 0;
 
 
 void setupSeats() {
@@ -112,10 +117,10 @@ int isRoomFull() {
 }
 
 void sendAnswerToClient(char* answer, int idClient) {
-    printf("%s\n", answer);
+    //printf("%s\n", answer);
     char fifoname[strlen(FIFO_ANS_PREFIX) + WIDTH_PID + 1];
     sprintf(fifoname, "%s%d", FIFO_ANS_PREFIX, idClient);
-    int fdAnswer = open(fifoname, O_WRONLY);
+    int fdAnswer = open(fifoname, O_WRONLY | O_NONBLOCK);
     write(fdAnswer, answer, strlen(answer));
     close(fdAnswer);
 } 
@@ -239,19 +244,24 @@ void *waitForRequest(void *threadnum) {
     Request request;
     
     sprintf(message, "%02d-OPEN\n", *(int *) threadnum);
-    
-
     write(fdSlog, message, strlen(message));
 
-    while(1) {
+    while(!closeTicketOffices) {
 
         pthread_mutex_lock(&buffer_lock);
-        while(bufferCount != 1)
+        while(bufferCount != 1 && !closeTicketOffices) {
+            printf("while %d\n", *(int *) threadnum);
             pthread_cond_wait(&slots_cond, &buffer_lock);
+        }
         
+        if (closeTicketOffices) {
+            printf("fechaaar\n");
+            continue;
+        }
+
         bufferCount = 0;
         request = *buffer;
-        printf("%d\n", buffer->clientId);
+        //printf("%d\n", buffer->clientId);
 
         pthread_mutex_unlock(&buffer_lock);  
 
@@ -267,7 +277,7 @@ void *waitForRequest(void *threadnum) {
             continue;
         }
 
-        printf("book request\n");
+        //printf("book request\n");
         bookRequest(request, *(int *) threadnum);
     }
 
@@ -290,6 +300,26 @@ void storeBookedSeats() {
 
     close(fdSBook);
 
+}
+
+void timeout_handler(int signo) {
+
+    closeTicketOffices = 1;
+
+    //int t;
+    //for (t = 0; t < num_ticket_offices; t++) {
+       // pthread_join(threads[t], NULL);
+   // }
+
+    storeBookedSeats();
+    write(fdSlog, SERVER_CLOSED, strlen(SERVER_CLOSED));
+    close(fdSlog);
+    close(fdrequests);
+    unlink(FIFO_REQ_NAME);
+    pthread_mutex_destroy(&buffer_lock);
+    pthread_cond_destroy(&slots_cond);
+
+    exit(0);
 }
 
 
@@ -320,15 +350,25 @@ int main(int argc, char *argv[]){
         return 1;
     }
 
+    struct sigaction sa;
+    sa.sa_handler = timeout_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+
+    if (sigaction(SIGALRM, &sa, NULL) == -1) {
+        fprintf(stderr,"Unable to install SIGALRM handler\n");
+        exit(1);
+    }
+
     setupSeats();
     buffer = (Request *)malloc (sizeof(Request));
 
-    pthread_t threads[num_ticket_offices];
+    pthread_t temp[num_ticket_offices];
+    threads = temp;
     int threads_num[num_ticket_offices];
-    int t = 1;
+    int t;
 
     fdSlog = open(SLOG_FILE, O_WRONLY | O_APPEND | O_CREAT, 0664);
-
 
     for (t = 1; t <= num_ticket_offices; t++) {
         threads_num[t-1] = t;
@@ -336,36 +376,26 @@ int main(int argc, char *argv[]){
     }
 
 
+    alarm(open_time);
 
-    int fdrequests = open(FIFO_REQ_NAME, O_RDONLY | O_NONBLOCK);
+    fdrequests = open(FIFO_REQ_NAME, O_RDONLY);
 
     char str[500];
 
-    printf("antes do while\n");
+    //printf("antes do while\n");
 
     do {
         int n = readline(fdrequests, str);
         if (n) {
-            printf("%s\n", str);
+            //printf("%s\n", str);
             if (bufferCount != 1) {
                 storeRequest(str);
                 bufferCount = 1;
                 pthread_cond_signal(&slots_cond);
             }
         }
+
     }
     while(1);
-
-    printf("fora do while\n");
-
-    storeBookedSeats();
-    
-    close(fdrequests);
-    unlink(FIFO_REQ_NAME);
-    pthread_mutex_destroy(&buffer_lock);
-    pthread_cond_destroy(&slots_cond);
-    //printf("nrs: %d\nnto: %d\not: %d\n", num_room_seats, num_ticket_offices, open_time);
-
     return 0;
-
 }
