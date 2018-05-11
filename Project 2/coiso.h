@@ -11,12 +11,14 @@
 #define SLOG_FILE "slog.txt"
 #define SBOOK_FILE "sbook.txt"
 #define CLOG_FILE "clog.txt"
+#define CBOOK_FILE "cbook.txt"
 #define MAX_SEAT -1
 #define INVALID_NUM_WANTED_SEATS -2
 #define INVALID_SEAT -3
 #define INVALID_PARAM -4
 #define UNAVAILABLE_SEAT -5
 #define FULL -6
+#define TIME_OUT -7
 
 typedef struct {
     int clientId;

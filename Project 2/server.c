@@ -155,8 +155,51 @@ void writeErrorToSlog(Request request, int error, int t) {
     }
 
     write(fdSlog, message, strlen(message));
-    sprintf(message, "%d", error);
-    sendAnswerToClient(message, request.clientId);
+}
+
+void sendErrorAnswerToClient(int error, int clientId) {
+   char message[3];
+   sprintf(message, "%d", error);
+   sendAnswerToClient(message, clientId);
+}
+
+void sendSuccessAnswerToClient(int *booked_seats, int num_seats, int clientId) {
+    char message[1000];
+    sprintf(message, "%d", num_seats);
+    int i;
+    for (i = 0; i < num_seats; i++) {
+        char temp[6];
+        sprintf(temp, " %d", booked_seats[i]);
+        strcat(message, temp);
+    }
+
+    strcat(message, "\n");
+    sendAnswerToClient(message, clientId);
+}
+
+void writeSuccessToSlog(Request request, int *booked_seats, int t) {
+
+    char message[1000];
+
+    sprintf(message, "%02d-%05d-%02d:", t, request.clientId, request.num_seats);
+
+    int i;
+    for (i = 0; i < request.num_wanted_seats; i++) {
+       char temp[6];
+       sprintf(temp, " %04d", request.seats[i]);
+       strcat(message, temp);
+    }
+
+    strcat(message, " -");
+
+    for (i = 0; i < request.num_seats; i++) {
+        char temp[6];
+        sprintf(temp, " %04d", booked_seats[i]);
+        strcat(message, temp);
+    }
+
+    strcat(message, "\n");
+    write(fdSlog, message, strlen(message));
 }
 
 void bookRequest(Request request, int thread_num) {
@@ -173,16 +216,20 @@ void bookRequest(Request request, int thread_num) {
         }
 
         if (booked_seats_num == request.num_seats) {
-            printf("success\n");
+            writeSuccessToSlog(request, booked_seats, thread_num);
+            sendSuccessAnswerToClient(booked_seats, booked_seats_num, request.clientId);
             return;
         }
     }
 
-    if (booked_seats_num != 0) {
-        for (i = 0; i < booked_seats_num; i++) {
-            freeSeat(seats, booked_seats[i]);
-        }
+    
+    for (i = 0; i < booked_seats_num; i++) {
+        freeSeat(seats, booked_seats[i]);
     }
+
+    writeErrorToSlog(request, UNAVAILABLE_SEAT, thread_num);
+    sendErrorAnswerToClient(UNAVAILABLE_SEAT, request.clientId);
+    
 }
 
 
@@ -211,10 +258,12 @@ void *waitForRequest(void *threadnum) {
         int result = validateRequest(request);
         if (result != 0) {
             writeErrorToSlog(request, result, *(int *) threadnum);
+            sendErrorAnswerToClient(result, request.clientId);
             continue;
         }
         else if (isRoomFull()) {
             writeErrorToSlog(request, FULL, *(int *) threadnum);
+            sendErrorAnswerToClient(result, request.clientId);
             continue;
         }
 
@@ -226,6 +275,21 @@ void *waitForRequest(void *threadnum) {
 
     write(fdSlog, message, strlen(message));
     pthread_exit(NULL);
+}
+
+void storeBookedSeats() {
+    int i;
+    int fdSBook = open(SBOOK_FILE, O_WRONLY | O_APPEND | O_CREAT, 0664);
+    for (i = 0; i < num_room_seats; i++) {
+        char temp[10];
+        if (seats[i].clientId) {
+            sprintf(temp, "%04d\n", seats[i].num);
+            write(fdSBook, temp, strlen(temp));
+        }
+    }
+
+    close(fdSBook);
+
 }
 
 
@@ -263,7 +327,7 @@ int main(int argc, char *argv[]){
     int threads_num[num_ticket_offices];
     int t = 1;
 
-    fdSlog = open(SLOG_FILE, O_WRONLY | O_TRUNC | O_CREAT, 0664);
+    fdSlog = open(SLOG_FILE, O_WRONLY | O_APPEND | O_CREAT, 0664);
 
 
     for (t = 1; t <= num_ticket_offices; t++) {
@@ -273,7 +337,7 @@ int main(int argc, char *argv[]){
 
 
 
-    int fdrequests = open(FIFO_REQ_NAME, O_RDONLY);
+    int fdrequests = open(FIFO_REQ_NAME, O_RDONLY | O_NONBLOCK);
 
     char str[500];
 
@@ -293,6 +357,8 @@ int main(int argc, char *argv[]){
     while(1);
 
     printf("fora do while\n");
+
+    storeBookedSeats();
     
     close(fdrequests);
     unlink(FIFO_REQ_NAME);

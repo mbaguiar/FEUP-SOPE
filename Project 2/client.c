@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <sys/file.h>
 #include <string.h>
+#include <time.h>
 #include "coiso.h"
 
 unsigned int time_out;
@@ -13,6 +14,7 @@ unsigned int pref_seat_list[MAX_CLI_SEATS];
 unsigned int pref_seat_count = 0;
 char message[1000];
 int fdClog;
+int fdCBook;
 
 void createMessage() {
     sprintf(message, "%d %d ", getpid(), num_wanted_seats);
@@ -46,6 +48,9 @@ void writeErrorToClog(int error) {
         case FULL:
             err = "FUL";
             break;
+        case TIME_OUT:
+            err = "OUT";
+            break;
     }
 
     sprintf(message, "%d %s\n", getpid(), err);
@@ -58,6 +63,12 @@ void writeSuccessToClog(int num, int seat_n, int i) {
     write(fdClog, message, strlen(message));
 }
 
+void storeBookedSeat(int seat_num) {
+    char message[10];
+    sprintf(message, "%04d\n", seat_num);
+    write(fdCBook, message, strlen(message));
+}
+
 void processAnswer(char *message) {
     int num;
     char *token;
@@ -65,13 +76,18 @@ void processAnswer(char *message) {
     token = strtok(message, s);
     num = strtoul(token, NULL, 0);
 
-    if (num < 0) writeErrorToClog(num);
+    if (num < 0) {
+        writeErrorToClog(num);
+        close(fdClog);
+        return;
+    }
 
     int i;
     for(i = 1; i <= num; i++) {
         token = strtok(NULL, s);
         int seat_n = strtoul(token, NULL, 0);
         writeSuccessToClog(num, seat_n, i);
+        storeBookedSeat(seat_n);
     }
 
     close(fdClog);
@@ -108,27 +124,40 @@ int main(int argc, char *argv[]){
 
     createMessage();
 
-    int fdrequests = open(FIFO_REQ_NAME, O_WRONLY);
+    int fdrequests = open(FIFO_REQ_NAME, O_WRONLY | O_NONBLOCK);
     int len = strlen(message);
     write(fdrequests, message, len);
     close(fdrequests);
 
-    int fdAnswer = open(fifoname, O_RDONLY);
-    fdClog = open(CLOG_FILE, O_WRONLY | O_CREAT | O_TRUNC, 0664);
+    int fdAnswer = open(fifoname, O_RDONLY | O_NONBLOCK);
+    fdClog = open(CLOG_FILE, O_WRONLY | O_CREAT | O_APPEND, 0664);
+    fdCBook = open(CBOOK_FILE, O_WRONLY | O_CREAT | O_APPEND, 0664);
     char str[500];
+
+    time_t endwait;
+    time_t start = time(NULL);
+    time_t seconds = time_out;
+
+    endwait = start + seconds;
+    int timedOut = 1;
 
     do {
         int n = readline(fdAnswer, str);
         if (n) {
             printf("%s\n", str);
             processAnswer(str);
+            timedOut = 0;
             break;
         }
+        start = time(NULL);
+    } while(start < endwait);
+
+    if (timedOut) {
+        writeErrorToClog(TIME_OUT);
     }
-    while(1);
 
 
-
+    close(fdCBook);
     close(fdAnswer);
     unlink(fifoname);
     return 0;
