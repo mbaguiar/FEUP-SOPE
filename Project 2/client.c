@@ -22,6 +22,7 @@ int fdAnswer;
 
 void createMessage() {
     sprintf(message, "%d %d ", getpid(), num_wanted_seats);
+    //printf("%d\n", getpid());
     int i;
     for (i = 0; i < pref_seat_count; i++) {
         char num[6];
@@ -54,6 +55,9 @@ void writeErrorToClog(int error) {
             break;
         case TIME_OUT:
             err = "OUT";
+            break;
+        case INVALID_PARAM:
+            err = "ERR";
             break;
     }
 
@@ -133,9 +137,13 @@ int main(int argc, char *argv[]){
         pref_seat_count++;
     }  */
 
-    while( (token = strtok(argv[3], " ")) != NULL) {
+    token = strtok(argv[3], " ");
+
+    while (token != NULL) {
         pref_seat_list[i++] = strtoul(token, NULL, 0);
+        printf("%s\n", token);
         pref_seat_count++;
+        token = strtok(NULL, " ");
     } 
 
     
@@ -174,7 +182,7 @@ int main(int argc, char *argv[]){
     do {
         int n = readline(fdAnswer, str);
         if (n) {
-            //printf("%s\n", str);
+            printf("%s\n", str);
             processAnswer(str);
             break;
         }
