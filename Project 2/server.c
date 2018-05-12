@@ -23,9 +23,12 @@ Seat seats[MAX_ROOM_SEATS];
 //mudar eventualmente nao sei o que é suposto fazer
 Request *buffer;
 int bufferCount = 0;
+sem_t buffer_empty;
+sem_t buffer_full;
 pthread_mutex_t buffer_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t num_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t slots_cond = PTHREAD_COND_INITIALIZER;
+pthread_mutex_t book_lock = PTHREAD_MUTEX_INITIALIZER;
 int fdSlog;
 int fdrequests;
 pthread_t *threads;
@@ -64,6 +67,7 @@ void processString(char *message) {
     }
 
     *buffer = request;
+    //sem_post(&buffer_empty);
     //printf("%d\n", buffer->clientId);
 }
 
@@ -252,7 +256,7 @@ void *waitForRequest(void *threadnum) {
         while(bufferCount != 1 && !closeTicketOffices) {
             //printf("while %d\n", *(int *) threadnum);
             pthread_cond_wait(&slots_cond, &buffer_lock);
-        }
+        } 
         
         if (closeTicketOffices) {
             printf("fechaaar\n");
@@ -260,8 +264,14 @@ void *waitForRequest(void *threadnum) {
             continue;
         }
 
-        bufferCount = 0;
+
+        /* if (sem_trywait(&buffer_full) != 0){
+            continue;
+        } */
+
         request = *buffer;
+        bufferCount = 0;
+        //sem_post(&buffer_empty);
         //printf("%d\n", buffer->clientId);
 
         pthread_mutex_unlock(&buffer_lock);  
@@ -279,7 +289,9 @@ void *waitForRequest(void *threadnum) {
         }
 
         //printf("book request\n");
+        pthread_mutex_lock(&book_lock);
         bookRequest(request, *(int *) threadnum);
+        pthread_mutex_unlock(&book_lock);
     }
 
     sprintf(message, "%02d-CLOSE\n", *(int *) threadnum);
@@ -365,7 +377,7 @@ int main(int argc, char *argv[]){
     }
 
     setupSeats();
-    buffer = (Request *)malloc (sizeof(Request));
+    buffer = (Request *) malloc(sizeof(Request));
 
     pthread_t temp[num_ticket_offices];
     threads = temp;
@@ -386,17 +398,25 @@ int main(int argc, char *argv[]){
 
     char str[500];
 
+    sem_init(&buffer_empty, 0, 1);
+    sem_init(&buffer_full, 0, 0);
+
     //printf("antes do while\n");
 
     do {
         int n = readline(fdrequests, str);
         if (n) {
             //printf("%s\n", str);
-            if (bufferCount != 1) {
+             if (bufferCount != 1) {
                 storeRequest(str);
                 bufferCount = 1;
                 pthread_cond_signal(&slots_cond);
-            }
+            } 
+
+            /* sem_trywait(&buffer_empty);
+            storeRequest(str);
+            sem_post(&buffer_full); */
+
         }
 
     }
