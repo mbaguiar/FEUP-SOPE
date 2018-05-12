@@ -109,7 +109,7 @@ void timeout_handler(int signo) {
 }
 
 int main(int argc, char *argv[]){
-    if (argc < 4){
+    if (argc != 4){
         printf("Wrong no of args.\nUsage: client <time_out> <num_wanted_seats> <pref_seat_list>\n");
         return 1;
     }
@@ -123,11 +123,20 @@ int main(int argc, char *argv[]){
         printf("Could not convert num_wanted_seats.\n");
         return 1;
     }
-    int i;
-    for (i = 3; i < argc; i++){
+    
+    char * token;
+
+    int i = 0;
+
+     /* for (i = 3; i < argc; i++){
         pref_seat_list[i-3] = strtoul(argv[i], NULL, 0);
         pref_seat_count++;
-    }
+    }  */
+
+    while( (token = strtok(argv[3], " ")) != NULL) {
+        pref_seat_list[i++] = strtoul(token, NULL, 0);
+        pref_seat_count++;
+    } 
 
     
     sprintf(fifoname, "%s%d", FIFO_ANS_PREFIX, getpid());
