@@ -29,7 +29,7 @@ void createMessage() {
         strcat(message, num);
     }
 
-    //printf("%s\n", message);
+    printf("%s\n", message);
 }
 
 void writeErrorToClog(int error) {
