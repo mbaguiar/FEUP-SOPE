@@ -298,8 +298,10 @@ void shutdown(){
     unlink(FIFO_REQ_NAME);
     pthread_mutex_destroy(&buffer_lock);
     pthread_mutex_destroy(&book_lock);
-    sem_destroy(buffer_empty);
-    sem_destroy(buffer_full);
+    sem_close(buffer_empty);
+    sem_unlink(BUF_EMPTY);
+    sem_close(buffer_full);
+    sem_unlink(BUF_FULL);
     exit(0);
 }
 
@@ -370,8 +372,8 @@ int main(int argc, char *argv[]){
     int fdCbook = open(CBOOK_FILE, O_WRONLY | O_TRUNC);
     close(fdCbook);
 
-    buffer_empty = sem_open("buffer_empty", O_CREAT, 0600, 1);
-    buffer_full = sem_open("buffer_full", O_CREAT, 0600, 0);
+    buffer_empty = sem_open(BUF_EMPTY, O_CREAT, 0600, 1);
+    buffer_full = sem_open(BUF_FULL, O_CREAT, 0600, 0);
 
     for (t = 1; t <= num_ticket_offices; t++) {
         threads_num[t-1] = t;

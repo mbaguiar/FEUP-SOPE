@@ -12,6 +12,8 @@
 #define SBOOK_FILE "sbook.txt"
 #define CLOG_FILE "clog.txt"
 #define CBOOK_FILE "cbook.txt"
+#define BUF_FULL "buffer_full"
+#define BUF_EMPTY "buffer_empty"
 #define MAX_SEAT -1
 #define INVALID_NUM_WANTED_SEATS -2
 #define INVALID_SEAT -3
