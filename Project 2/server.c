@@ -218,7 +218,7 @@ void bookRequest(Request request, int thread_num) {
 
         if(isSeatFree(seats, request.seats[i])) {
             bookSeat(seats, request.seats[i], request.clientId);
-            booked_seats[i] = request.seats[i];
+            booked_seats[booked_seats_num] = request.seats[i];
             booked_seats_num++;
             
         }
@@ -230,8 +230,10 @@ void bookRequest(Request request, int thread_num) {
         }
     }
 
+    
     for (i = 0; i < booked_seats_num; i++) {
         freeSeat(seats, booked_seats[i]);
+        
     }
 
     writeErrorToSlog(request, UNAVAILABLE_SEAT, thread_num);
@@ -298,7 +300,7 @@ void *waitForRequest(void *threadnum) {
 
 void storeBookedSeats() {
     int i;
-    int fdSBook = open(SBOOK_FILE, O_WRONLY | O_CREAT, 0664);
+    int fdSBook = open(SBOOK_FILE, O_WRONLY | O_CREAT | O_TRUNC, 0664);
     for (i = 0; i < num_room_seats; i++) {
         char temp[10];
         if (seats[i].clientId) {
@@ -389,7 +391,7 @@ int main(int argc, char *argv[]){
     int threads_num[num_ticket_offices];
     int t;
 
-    fdSlog = open(SLOG_FILE, O_WRONLY | O_CREAT, 0664);
+    fdSlog = open(SLOG_FILE, O_WRONLY | O_CREAT | O_TRUNC, 0664);
 
     int fdClog = open(CLOG_FILE, O_WRONLY | O_TRUNC);
     close(fdClog);
