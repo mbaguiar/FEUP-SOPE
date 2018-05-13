@@ -84,7 +84,7 @@ void processAnswer(char *message) {
     token = strtok(message, s);
     num = strtoul(token, NULL, 0);
 
-    //printf("%d\n", num);
+    printf("%d\n", num);
 
     if (num < 0) {
         writeErrorToClog(num);
