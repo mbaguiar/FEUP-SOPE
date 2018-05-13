@@ -91,7 +91,7 @@ int validateRequest(Request request) {
     if (request.num_seats > num_room_seats)
         return INVALID_PARAM;
     if (request.num_wanted_seats < request.num_seats)
-        return INVALID_PARAM;
+        return INVALID_NUM_WANTED_SEATS;
 
     int i;
     for (i = 0; i < request.num_wanted_seats; i++) {
