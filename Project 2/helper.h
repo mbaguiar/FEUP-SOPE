@@ -20,9 +20,9 @@
 #define FULL -6
 #define TIME_OUT -7
 #define SERVER_CLOSED "SERVER CLOSE\n"
-#define xstr(x) str(x)
-#define str(x) #x
-#define FILLER(w) "%0" xstr(w) "d"
+#define macroToString(x) toString(x)
+#define toString(x) #x
+#define FILLER(w) "%0" macroToString(w) "d"
 #define SLOG_SEAT_FORMAT " " FILLER(WIDTH_SEAT)
 #define LOG_BOOKED_SEATS_FORMAT FILLER(WIDTH_SEAT) "\n"
 #define SLOG_BOOK_FORMAT FILLER(2) "-" FILLER(WIDTH_PID) "-" FILLER(2)
@@ -30,6 +30,7 @@
 #define CLOG_FAIL_BOOK_FORMAT FILLER(WIDTH_PID) " %s\n"
 #define SLOG_OFFICE_OPEN FILLER(2) "-OPEN\n"
 #define SLOG_OFFICE_CLOSE FILLER(2) "-CLOSE\n"
+
 
 typedef struct {
     int clientId;

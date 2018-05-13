@@ -24,7 +24,6 @@ Seat seats[MAX_ROOM_SEATS];
 Request *buffer;
 sem_t *buffer_empty, *buffer_full;
 pthread_mutex_t buffer_lock = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t num_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t book_lock = PTHREAD_MUTEX_INITIALIZER;
 int fdSlog;
 int fdrequests;
@@ -288,22 +287,25 @@ void storeBookedSeats() {
 }
 
 void shutdown(){
+    int t;
+    for (t = 0; t < num_ticket_offices; t++) {
+        pthread_join(threads[t], NULL);
+    }
     storeBookedSeats();
     write(fdSlog, SERVER_CLOSED, strlen(SERVER_CLOSED));
     close(fdSlog);
     close(fdrequests);
     unlink(FIFO_REQ_NAME);
     pthread_mutex_destroy(&buffer_lock);
+    pthread_mutex_destroy(&book_lock);
+    sem_destroy(buffer_empty);
+    sem_destroy(buffer_full);
     exit(0);
 }
 
 void timeout_handler(int signo) {
-
     closeTicketOffices = 1;    
-    int t;
-    for (t = 0; t < num_ticket_offices; t++) {
-        pthread_join(threads[t], NULL);
-    }
+
     shutdown();
 }
 
