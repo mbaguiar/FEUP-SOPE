@@ -22,15 +22,12 @@ int fdAnswer;
 
 void createMessage() {
     sprintf(message, "%d %d ", getpid(), num_wanted_seats);
-    //printf("%d\n", getpid());
     int i;
     for (i = 0; i < pref_seat_count; i++) {
         char num[6];
         sprintf(num, "%d ", pref_seat_list[i]);
         strcat(message, num);
     }
-
-    printf("%s\n", message);
 }
 
 void writeErrorToClog(int error) {
@@ -61,19 +58,19 @@ void writeErrorToClog(int error) {
             break;
     }
 
-    sprintf(message, "%d %s\n", getpid(), err);
+    sprintf(message, CLOG_FAIL_BOOK_FORMAT , getpid(), err);
     write(fdClog, message, strlen(message));
 }
 
 void writeSuccessToClog(int num, int seat_n, int i) {
     char message[20];
-    sprintf(message, "%05d %02d.%02d %04d\n", getpid(), i, num, seat_n);
+    sprintf(message, CLOG_SUCCESS_BOOK_FORMAT , getpid(), i, num, seat_n);
     write(fdClog, message, strlen(message));
 }
 
 void storeBookedSeat(int seat_num) {
     char message[10];
-    sprintf(message, "%04d\n", seat_num);
+    sprintf(message, LOG_BOOKED_SEATS_FORMAT, seat_num);
     write(fdCBook, message, strlen(message));
 }
 
@@ -83,8 +80,6 @@ void processAnswer(char *message) {
     char s[] = " ";
     token = strtok(message, s);
     num = strtoul(token, NULL, 0);
-
-    printf("%d\n", num);
 
     if (num < 0) {
         writeErrorToClog(num);
@@ -96,7 +91,6 @@ void processAnswer(char *message) {
     for(i = 1; i <= num; i++) {
         token = strtok(NULL, s);
         int seat_n = strtoul(token, NULL, 0);
-        //printf("%d\n", seat_n);
         writeSuccessToClog(num, seat_n, i);
         storeBookedSeat(seat_n);
     }
@@ -129,23 +123,13 @@ int main(int argc, char *argv[]){
     }
     
     char * token;
-
     int i = 0;
-
-     /* for (i = 3; i < argc; i++){
-        pref_seat_list[i-3] = strtoul(argv[i], NULL, 0);
-        pref_seat_count++;
-    }  */
-
     token = strtok(argv[3], " ");
-
     while (token != NULL) {
         pref_seat_list[i++] = strtoul(token, NULL, 0);
-        printf("%s\n", token);
         pref_seat_count++;
         token = strtok(NULL, " ");
     } 
-
     
     sprintf(fifoname, "%s%d", FIFO_ANS_PREFIX, getpid());
     
@@ -182,7 +166,6 @@ int main(int argc, char *argv[]){
     do {
         int n = readline(fdAnswer, str);
         if (n) {
-            printf("%s\n", str);
             processAnswer(str);
             break;
         }

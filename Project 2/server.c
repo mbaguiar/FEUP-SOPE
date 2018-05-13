@@ -121,7 +121,6 @@ int isRoomFull() {
 }
 
 void sendAnswerToClient(char* answer, int idClient) {
-    //printf("%s\n", answer);
     char fifoname[strlen(FIFO_ANS_PREFIX) + WIDTH_PID + 1];
     sprintf(fifoname, "%s%d", FIFO_ANS_PREFIX, idClient);
     int fdAnswer = open(fifoname, O_WRONLY | O_NONBLOCK);
@@ -132,13 +131,13 @@ void sendAnswerToClient(char* answer, int idClient) {
 void writeErrorToSlog(Request request, int error, int t) {
     char message[1000];
 
-    sprintf(message, "%02d-%05d-%02d:", t, request.clientId, request.num_seats);
+    sprintf(message, SLOG_BOOK_FORMAT, t, request.clientId, request.num_seats);
 
     int i;
 
     for (i = 0; i < request.num_wanted_seats; i++) {
        char temp[6];
-       sprintf(temp, " %04d", request.seats[i]);
+       sprintf(temp, SLOG_SEAT_FORMAT, request.seats[i]);
        strcat(message, temp);
     }
     switch(error) {
@@ -190,12 +189,12 @@ void writeSuccessToSlog(Request request, int *booked_seats, int t) {
 
     char message[1000];
 
-    sprintf(message, "%02d-%05d-%02d:", t, request.clientId, request.num_seats);
+    sprintf(message, SLOG_BOOK_FORMAT, t, request.clientId, request.num_seats);
 
     int i;
     for (i = 0; i < request.num_wanted_seats; i++) {
        char temp[6];
-       sprintf(temp, " %04d", request.seats[i]);
+       sprintf(temp, SLOG_SEAT_FORMAT, request.seats[i]);
        strcat(message, temp);
     }
 
@@ -203,7 +202,7 @@ void writeSuccessToSlog(Request request, int *booked_seats, int t) {
 
     for (i = 0; i < request.num_seats; i++) {
         char temp[6];
-        sprintf(temp, " %04d", booked_seats[i]);
+        sprintf(temp, SLOG_SEAT_FORMAT, booked_seats[i]);
         strcat(message, temp);
     }
 
@@ -231,7 +230,6 @@ void bookRequest(Request request, int thread_num) {
         }
     }
 
-    
     for (i = 0; i < booked_seats_num; i++) {
         freeSeat(seats, booked_seats[i]);
     }
@@ -247,19 +245,17 @@ void *waitForRequest(void *threadnum) {
     char message[10];
     Request request;
     
-    sprintf(message, "%02d-OPEN\n", *(int *) threadnum);
+    sprintf(message, SLOG_OFFICE_OPEN, *(int *) threadnum);
     write(fdSlog, message, strlen(message));
 
     while(!closeTicketOffices) {
 
         pthread_mutex_lock(&buffer_lock);
         while(bufferCount != 1 && !closeTicketOffices) {
-            //printf("while %d\n", *(int *) threadnum);
             pthread_cond_wait(&slots_cond, &buffer_lock);
         } 
         
         if (closeTicketOffices) {
-            printf("fechaaar\n");
             pthread_mutex_unlock(&buffer_lock);
             continue;
         }
@@ -294,7 +290,7 @@ void *waitForRequest(void *threadnum) {
         pthread_mutex_unlock(&book_lock);
     }
 
-    sprintf(message, "%02d-CLOSE\n", *(int *) threadnum);
+    sprintf(message, SLOG_OFFICE_CLOSE, *(int *) threadnum);
 
     write(fdSlog, message, strlen(message));
     pthread_exit(NULL);
@@ -302,17 +298,28 @@ void *waitForRequest(void *threadnum) {
 
 void storeBookedSeats() {
     int i;
-    int fdSBook = open(SBOOK_FILE, O_WRONLY | O_APPEND | O_CREAT, 0664);
+    int fdSBook = open(SBOOK_FILE, O_WRONLY | O_CREAT, 0664);
     for (i = 0; i < num_room_seats; i++) {
         char temp[10];
         if (seats[i].clientId) {
-            sprintf(temp, "%04d\n", seats[i].num);
+            sprintf(temp, LOG_BOOKED_SEATS_FORMAT, seats[i].num);
             write(fdSBook, temp, strlen(temp));
         }
     }
 
     close(fdSBook);
 
+}
+
+void shutdown(){
+    storeBookedSeats();
+    write(fdSlog, SERVER_CLOSED, strlen(SERVER_CLOSED));
+    close(fdSlog);
+    close(fdrequests);
+    unlink(FIFO_REQ_NAME);
+    pthread_mutex_destroy(&buffer_lock);
+    pthread_cond_destroy(&slots_cond);
+    exit(0);
 }
 
 void timeout_handler(int signo) {
@@ -326,18 +333,8 @@ void timeout_handler(int signo) {
         pthread_join(threads[t], NULL);
 
     }
-
-    storeBookedSeats();
-    write(fdSlog, SERVER_CLOSED, strlen(SERVER_CLOSED));
-    close(fdSlog);
-    close(fdrequests);
-    unlink(FIFO_REQ_NAME);
-    pthread_mutex_destroy(&buffer_lock);
-    pthread_cond_destroy(&slots_cond);
-
-    pthread_exit(0);
+    shutdown();
 }
-
 
 
 int main(int argc, char *argv[]){
@@ -348,6 +345,9 @@ int main(int argc, char *argv[]){
 
     if ( (num_room_seats = strtoul(argv[1], NULL, 0)) == 0){
         printf("Could not convert num_room_seats.\n");
+        return 1;
+    } else if (num_room_seats > MAX_ROOM_SEATS){
+        printf("num_room_seats greater than MAX_ROOM_SEATS.\n");
         return 1;
     }
 
@@ -376,6 +376,11 @@ int main(int argc, char *argv[]){
         exit(1);
     }
 
+    if (sigaction(SIGINT, &sa, NULL) == -1) {
+        fprintf(stderr,"Unable to install SIGINT handler\n");
+        exit(1);
+    }
+
     setupSeats();
     buffer = (Request *) malloc(sizeof(Request));
 
@@ -384,7 +389,13 @@ int main(int argc, char *argv[]){
     int threads_num[num_ticket_offices];
     int t;
 
-    fdSlog = open(SLOG_FILE, O_WRONLY | O_APPEND | O_CREAT, 0664);
+    fdSlog = open(SLOG_FILE, O_WRONLY | O_CREAT, 0664);
+
+    int fdClog = open(CLOG_FILE, O_WRONLY | O_TRUNC);
+    close(fdClog);
+    
+    int fdCbook = open(CBOOK_FILE, O_WRONLY | O_TRUNC);
+    close(fdCbook);
 
     for (t = 1; t <= num_ticket_offices; t++) {
         threads_num[t-1] = t;
