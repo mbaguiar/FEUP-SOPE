@@ -9,7 +9,8 @@
 #include <semaphore.h>
 #include <time.h>
 #include <signal.h>
-#include "coiso.h"
+#include <errno.h>
+#include "helper.h"
 
 typedef struct {
     int clientId;
@@ -20,14 +21,10 @@ unsigned int num_room_seats;
 unsigned int num_ticket_offices;
 unsigned int open_time;
 Seat seats[MAX_ROOM_SEATS];
-//mudar eventualmente nao sei o que é suposto fazer
 Request *buffer;
-int bufferCount = 0;
-sem_t buffer_empty;
-sem_t buffer_full;
+sem_t *buffer_empty, *buffer_full;
 pthread_mutex_t buffer_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t num_lock = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t slots_cond = PTHREAD_COND_INITIALIZER;
 pthread_mutex_t book_lock = PTHREAD_MUTEX_INITIALIZER;
 int fdSlog;
 int fdrequests;
@@ -61,14 +58,9 @@ void processString(char *message) {
         token = strtok(NULL, s);
         if (token == NULL) break;
         request.seats[request.num_wanted_seats] = strtoul(token, NULL, 0);
-        //printf("%d ", request.seats[request.num_wanted_seats]);
         request.num_wanted_seats++;
-        //printf("%d\n", request.num_wanted_seats);
     }
-
     *buffer = request;
-    //sem_post(&buffer_empty);
-    //printf("%d\n", buffer->clientId);
 }
 
 void storeRequest(char *message) {
@@ -130,11 +122,8 @@ void sendAnswerToClient(char* answer, int idClient) {
 
 void writeErrorToSlog(Request request, int error, int t) {
     char message[1000];
-
     sprintf(message, SLOG_BOOK_FORMAT, t, request.clientId, request.num_seats);
-
     int i;
-
     for (i = 0; i < request.num_wanted_seats; i++) {
        char temp[6];
        sprintf(temp, SLOG_SEAT_FORMAT, request.seats[i]);
@@ -197,7 +186,6 @@ void writeSuccessToSlog(Request request, int *booked_seats, int t) {
        sprintf(temp, SLOG_SEAT_FORMAT, request.seats[i]);
        strcat(message, temp);
     }
-
     strcat(message, " -");
 
     for (i = 0; i < request.num_seats; i++) {
@@ -205,7 +193,6 @@ void writeSuccessToSlog(Request request, int *booked_seats, int t) {
         sprintf(temp, SLOG_SEAT_FORMAT, booked_seats[i]);
         strcat(message, temp);
     }
-
     strcat(message, "\n");
     write(fdSlog, message, strlen(message));
 }
@@ -229,13 +216,10 @@ void bookRequest(Request request, int thread_num) {
             return;
         }
     }
-
     
     for (i = 0; i < booked_seats_num; i++) {
-        freeSeat(seats, booked_seats[i]);
-        
+        freeSeat(seats, booked_seats[i]); 
     }
-
     writeErrorToSlog(request, UNAVAILABLE_SEAT, thread_num);
     sendErrorAnswerToClient(UNAVAILABLE_SEAT, request.clientId);
     
@@ -251,27 +235,21 @@ void *waitForRequest(void *threadnum) {
     write(fdSlog, message, strlen(message));
 
     while(!closeTicketOffices) {
-
         pthread_mutex_lock(&buffer_lock);
-        while(bufferCount != 1 && !closeTicketOffices) {
-            pthread_cond_wait(&slots_cond, &buffer_lock);
-        } 
-        
-        if (closeTicketOffices) {
+         if (closeTicketOffices) {
             pthread_mutex_unlock(&buffer_lock);
             continue;
+        } 
+
+         if (sem_trywait(buffer_full) == -1){
+            if (errno == EAGAIN){
+                pthread_mutex_unlock(&buffer_lock);
+                continue;
+            }    
         }
 
-
-        /* if (sem_trywait(&buffer_full) != 0){
-            continue;
-        } */
-
         request = *buffer;
-        bufferCount = 0;
-        //sem_post(&buffer_empty);
-        //printf("%d\n", buffer->clientId);
-
+        sem_post(buffer_empty);
         pthread_mutex_unlock(&buffer_lock);  
 
         int result = validateRequest(request);
@@ -286,14 +264,12 @@ void *waitForRequest(void *threadnum) {
             continue;
         }
 
-        //printf("book request\n");
         pthread_mutex_lock(&book_lock);
         bookRequest(request, *(int *) threadnum);
         pthread_mutex_unlock(&book_lock);
     }
 
     sprintf(message, SLOG_OFFICE_CLOSE, *(int *) threadnum);
-
     write(fdSlog, message, strlen(message));
     pthread_exit(NULL);
 }
@@ -308,9 +284,7 @@ void storeBookedSeats() {
             write(fdSBook, temp, strlen(temp));
         }
     }
-
     close(fdSBook);
-
 }
 
 void shutdown(){
@@ -320,20 +294,15 @@ void shutdown(){
     close(fdrequests);
     unlink(FIFO_REQ_NAME);
     pthread_mutex_destroy(&buffer_lock);
-    pthread_cond_destroy(&slots_cond);
     exit(0);
 }
 
 void timeout_handler(int signo) {
 
-    closeTicketOffices = 1;
-
-    pthread_cond_broadcast(&slots_cond);
-    
+    closeTicketOffices = 1;    
     int t;
     for (t = 0; t < num_ticket_offices; t++) {
         pthread_join(threads[t], NULL);
-
     }
     shutdown();
 }
@@ -399,6 +368,9 @@ int main(int argc, char *argv[]){
     int fdCbook = open(CBOOK_FILE, O_WRONLY | O_TRUNC);
     close(fdCbook);
 
+    buffer_empty = sem_open("buffer_empty", O_CREAT, 0600, 1);
+    buffer_full = sem_open("buffer_full", O_CREAT, 0600, 0);
+
     for (t = 1; t <= num_ticket_offices; t++) {
         threads_num[t-1] = t;
         pthread_create(&threads[t-1], NULL, waitForRequest, (void *) &threads_num[t-1]);
@@ -411,27 +383,13 @@ int main(int argc, char *argv[]){
 
     char str[500];
 
-    sem_init(&buffer_empty, 0, 1);
-    sem_init(&buffer_full, 0, 0);
-
-    //printf("antes do while\n");
-
     do {
         int n = readline(fdrequests, str);
         if (n) {
-            //printf("%s\n", str);
-             if (bufferCount != 1) {
-                storeRequest(str);
-                bufferCount = 1;
-                pthread_cond_signal(&slots_cond);
-            } 
-
-            /* sem_trywait(&buffer_empty);
+            sem_wait(buffer_empty);
             storeRequest(str);
-            sem_post(&buffer_full); */
-
+            sem_post(buffer_full);
         }
-
     }
     while(1);
     return 0;
