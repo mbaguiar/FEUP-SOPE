@@ -150,7 +150,8 @@ void writeErrorToSlog(Request request, int error, int t) {
 
     }
 
-    write(fdSlog, message, strlen(message) + 1);
+   
+    write(fdSlog, message, strlen(message));
 }
 
 void sendErrorAnswerToClient(int error, int clientId) {
@@ -193,7 +194,8 @@ void writeSuccessToSlog(Request request, int *booked_seats, int t) {
         strcat(message, temp);
     }
     strcat(message, "\n");
-    write(fdSlog, message, strlen(message) + 1);
+    
+    write(fdSlog, message, strlen(message));
 }
 
 void bookRequest(Request request, int thread_num) {
@@ -231,7 +233,7 @@ void *waitForRequest(void *threadnum) {
     Request request;
     
     sprintf(message, SLOG_OFFICE_OPEN, *(int *) threadnum);
-    write(fdSlog, message, strlen(message) + 1);
+    write(fdSlog, message, strlen(message) );
 
     while(!closeTicketOffices) {
         pthread_mutex_lock(&buffer_lock);
@@ -269,7 +271,7 @@ void *waitForRequest(void *threadnum) {
     }
 
     sprintf(message, SLOG_OFFICE_CLOSE, *(int *) threadnum);
-    write(fdSlog, message, strlen(message) + 1);
+    write(fdSlog, message, strlen(message));
     pthread_exit(NULL);
 }
 
@@ -280,7 +282,7 @@ void storeBookedSeats() {
         char temp[10];
         if (seats[i].clientId) {
             sprintf(temp, LOG_BOOKED_SEATS_FORMAT, seats[i].num);
-            write(fdSBook, temp, strlen(temp) + 1);
+            write(fdSBook, temp, strlen(temp));
         }
     }
     close(fdSBook);
@@ -292,7 +294,7 @@ void shutdown(){
         pthread_join(threads[t], NULL);
     }
     storeBookedSeats();
-    write(fdSlog, SERVER_CLOSED, strlen(SERVER_CLOSED) + 1);
+    write(fdSlog, SERVER_CLOSED, strlen(SERVER_CLOSED));
     close(fdSlog);
     close(fdrequests);
     unlink(FIFO_REQ_NAME);
@@ -364,7 +366,7 @@ int main(int argc, char *argv[]){
     int threads_num[num_ticket_offices];
     int t;
 
-    fdSlog = open(SLOG_FILE, O_WRONLY | O_CREAT | O_TRUNC, 0664);
+    fdSlog = open(SLOG_FILE, O_WRONLY | O_CREAT | O_TRUNC | O_APPEND, 0664);
 
     int fdClog = open(CLOG_FILE, O_WRONLY | O_TRUNC);
     close(fdClog);

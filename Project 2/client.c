@@ -59,19 +59,19 @@ void writeErrorToClog(int error) {
     }
 
     sprintf(message, CLOG_FAIL_BOOK_FORMAT , getpid(), err);
-    write(fdClog, message, strlen(message) + 1);
+    write(fdClog, message, strlen(message));
 }
 
 void writeSuccessToClog(int num, int seat_n, int i) {
     char message[20];
     sprintf(message, CLOG_SUCCESS_BOOK_FORMAT , getpid(), i, num, seat_n);
-    write(fdClog, message, strlen(message) + 1);
+    write(fdClog, message, strlen(message));
 }
 
 void storeBookedSeat(int seat_num) {
     char message[10];
     sprintf(message, LOG_BOOKED_SEATS_FORMAT, seat_num);
-    write(fdCBook, message, strlen(message) + 1);
+    write(fdCBook, message, strlen(message));
 }
 
 void processAnswer(char *message) {
