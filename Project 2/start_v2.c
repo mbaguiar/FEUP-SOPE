@@ -564,8 +564,7 @@ static pid_t create_client_process(const struct client_info *ci) {
 
       // replace last space of the list of preferences by the null character
       preferences[idx-1] = '\0';
-      printf("%s\n", preferences);
-
+  
       // execute client process
       execlp("./client", "./client", timeout, num_wanted_seats, preferences, NULL);
 

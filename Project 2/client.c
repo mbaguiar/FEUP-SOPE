@@ -59,19 +59,19 @@ void writeErrorToClog(int error) {
     }
 
     sprintf(message, CLOG_FAIL_BOOK_FORMAT , getpid(), err);
-    write(fdClog, message, strlen(message));
+    write(fdClog, message, strlen(message) + 1);
 }
 
 void writeSuccessToClog(int num, int seat_n, int i) {
     char message[20];
     sprintf(message, CLOG_SUCCESS_BOOK_FORMAT , getpid(), i, num, seat_n);
-    write(fdClog, message, strlen(message));
+    write(fdClog, message, strlen(message) + 1);
 }
 
 void storeBookedSeat(int seat_num) {
     char message[10];
     sprintf(message, LOG_BOOKED_SEATS_FORMAT, seat_num);
-    write(fdCBook, message, strlen(message));
+    write(fdCBook, message, strlen(message) + 1);
 }
 
 void processAnswer(char *message) {
@@ -131,7 +131,7 @@ int main(int argc, char *argv[]){
         token = strtok(NULL, " ");
     } 
     
-    sprintf(fifoname, "%s%d", FIFO_ANS_PREFIX, getpid());
+    sprintf(fifoname, "%s%d", FIFO_ANS_PREFIX, getpid()); 
     
     if (mkfifo(fifoname, 0660)){
         printf("Error creating answers FIFO.\n");
@@ -155,7 +155,7 @@ int main(int argc, char *argv[]){
     fdClog = open(CLOG_FILE, O_WRONLY | O_CREAT | O_APPEND, 0664);
 
     int fdrequests = open(FIFO_REQ_NAME, O_WRONLY);
-    int len = strlen(message);
+    int len = strlen(message) + 1;
     write(fdrequests, message, len);
     close(fdrequests);
 

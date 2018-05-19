@@ -115,7 +115,7 @@ void sendAnswerToClient(char* answer, int idClient) {
     char fifoname[strlen(FIFO_ANS_PREFIX) + WIDTH_PID + 1];
     sprintf(fifoname, "%s%d", FIFO_ANS_PREFIX, idClient);
     int fdAnswer = open(fifoname, O_WRONLY | O_NONBLOCK);
-    write(fdAnswer, answer, strlen(answer));
+    write(fdAnswer, answer, strlen(answer) + 1);
     close(fdAnswer);
 } 
 
@@ -150,7 +150,7 @@ void writeErrorToSlog(Request request, int error, int t) {
 
     }
 
-    write(fdSlog, message, strlen(message));
+    write(fdSlog, message, strlen(message) + 1);
 }
 
 void sendErrorAnswerToClient(int error, int clientId) {
@@ -193,7 +193,7 @@ void writeSuccessToSlog(Request request, int *booked_seats, int t) {
         strcat(message, temp);
     }
     strcat(message, "\n");
-    write(fdSlog, message, strlen(message));
+    write(fdSlog, message, strlen(message) + 1);
 }
 
 void bookRequest(Request request, int thread_num) {
@@ -231,7 +231,7 @@ void *waitForRequest(void *threadnum) {
     Request request;
     
     sprintf(message, SLOG_OFFICE_OPEN, *(int *) threadnum);
-    write(fdSlog, message, strlen(message));
+    write(fdSlog, message, strlen(message) + 1);
 
     while(!closeTicketOffices) {
         pthread_mutex_lock(&buffer_lock);
@@ -269,7 +269,7 @@ void *waitForRequest(void *threadnum) {
     }
 
     sprintf(message, SLOG_OFFICE_CLOSE, *(int *) threadnum);
-    write(fdSlog, message, strlen(message));
+    write(fdSlog, message, strlen(message) + 1);
     pthread_exit(NULL);
 }
 
@@ -280,7 +280,7 @@ void storeBookedSeats() {
         char temp[10];
         if (seats[i].clientId) {
             sprintf(temp, LOG_BOOKED_SEATS_FORMAT, seats[i].num);
-            write(fdSBook, temp, strlen(temp));
+            write(fdSBook, temp, strlen(temp) + 1);
         }
     }
     close(fdSBook);
@@ -292,7 +292,7 @@ void shutdown(){
         pthread_join(threads[t], NULL);
     }
     storeBookedSeats();
-    write(fdSlog, SERVER_CLOSED, strlen(SERVER_CLOSED));
+    write(fdSlog, SERVER_CLOSED, strlen(SERVER_CLOSED) + 1);
     close(fdSlog);
     close(fdrequests);
     unlink(FIFO_REQ_NAME);
