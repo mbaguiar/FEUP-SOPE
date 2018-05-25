@@ -56,8 +56,12 @@ void processString(char *message) {
     while(token != NULL) {
         token = strtok(NULL, s);
         if (token == NULL) break;
-        request.seats[request.num_wanted_seats] = strtoul(token, NULL, 0);
-        request.num_wanted_seats++;
+        int t = strtoul(token, NULL, 0);
+        if (t != 0){
+            request.seats[request.num_wanted_seats] = t;
+            request.num_wanted_seats++;
+        }
+        
     }
     *buffer = request;
 }
@@ -114,8 +118,9 @@ int isRoomFull() {
 void sendAnswerToClient(char* answer, int idClient) {
     char fifoname[strlen(FIFO_ANS_PREFIX) + WIDTH_PID + 1];
     sprintf(fifoname, "%s%d", FIFO_ANS_PREFIX, idClient);
-    int fdAnswer = open(fifoname, O_WRONLY | O_NONBLOCK);
-    write(fdAnswer, answer, strlen(answer) + 1);
+    int fdAnswer = open(fifoname, O_WRONLY);
+    if (fdAnswer < 0) printf("Error opening fifo\n");
+    write(fdAnswer, answer, strlen(answer));
     close(fdAnswer);
 } 
 

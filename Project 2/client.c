@@ -155,7 +155,7 @@ int main(int argc, char *argv[]){
     fdClog = open(CLOG_FILE, O_WRONLY | O_CREAT | O_APPEND, 0664);
 
     int fdrequests = open(FIFO_REQ_NAME, O_WRONLY);
-    int len = strlen(message) + 1;
+    int len = strlen(message);
     write(fdrequests, message, len);
     close(fdrequests);
 

@@ -38,7 +38,7 @@ typedef struct {
     int clientId;
     int num_seats;
     int num_wanted_seats;
-    int seats[MAX_CLI_SEATS];
+    int seats[MAX_ROOM_SEATS];
 } Request;
 
 int readline(int fd, char *str){
